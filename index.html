@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Keto Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --bg2: #171717;
+    --bg3: #1f1f1f;
+    --border: #2a2a2a;
+    --border2: #333;
+    --text: #e8e8e8;
+    --text2: #888;
+    --text3: #555;
+    --green: #4ade80;
+    --green-dim: #1a3a26;
+    --amber: #fbbf24;
+    --amber-dim: #2d2210;
+    --red: #f87171;
+    --red-dim: #2d1515;
+    --purple: #a78bfa;
+    --purple-dim: #1e1530;
+    --teal: #2dd4bf;
+    --accent: #4ade80;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── LAYOUT ── */
+  .shell {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 0 80px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    padding: 24px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .header-left h1 {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+  .header-left .date {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 1px;
+    font-family: 'DM Mono', monospace;
+  }
+  .sync-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    transition: all .3s;
+  }
+  .sync-dot.off { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .sync-dot.loading {
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+    animation: blink .8s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ── DAY NAV ── */
+  .day-nav {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .day-nav button {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    color: var(--text2);
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all .15s;
+  }
+  .day-nav button:hover { border-color: var(--text3); color: var(--text); }
+  .day-label {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'DM Mono', monospace;
+    color: var(--text);
+  }
+
+  /* ── MACROS ── */
+  .macros {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+  .macro-cell {
+    background: var(--bg);
+    padding: 14px 12px;
+    text-align: center;
+  }
+  .macro-cell .m-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text3);
+    margin-bottom: 5px;
+    font-family: 'DM Mono', monospace;
+  }
+  .macro-cell .m-val {
+    font-size: 20px;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    line-height: 1;
+  }
+  .macro-cell .m-unit { font-size: 11px; color: var(--text2); }
+  .macro-cell .m-goal {
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+  .macro-cell .m-bar {
+    height: 2px;
+    background: var(--border2);
+    border-radius: 1px;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  .macro-cell .m-fill {
+    height: 2px;
+    border-radius: 1px;
+    transition: width .5s cubic-bezier(.4,0,.2,1);
+  }
+  .mc-kcal .m-val { color: var(--purple); }
+  .mc-kcal .m-fill { background: var(--purple); }
+  .mc-prot .m-val { color: var(--teal); }
+  .mc-prot .m-fill { background: var(--teal); }
+  .mc-fat  .m-val { color: var(--amber); }
+  .mc-fat  .m-fill { background: var(--amber); }
+  .mc-carb .m-val { color: var(--green); }
+  .mc-carb .m-fill { background: var(--green); }
+  .mc-carb .m-fill.over { background: var(--red); }
+
+  /* ── SECTIONS ── */
+  .section {
+    padding: 20px 20px 0;
+  }
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--text3);
+    margin-bottom: 10px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── WEIGHT ── */
+  .weight-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .weight-row input {
+    width: 100px;
+    padding: 10px 12px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 15px;
+    font-family: 'DM Mono', monospace;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .weight-row input:focus { border-color: var(--text3); }
+  .weight-row input::placeholder { color: var(--text3); }
+
+  .btn {
+    padding: 10px 16px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    color: var(--text2);
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--text3); color: var(--text); }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .btn.cta {
+    background: var(--green-dim);
+    border-color: #2a5a3a;
+    color: var(--green);
+    font-weight: 500;
+  }
+  .btn.cta:hover { background: #1f4a30; }
+
+  /* ── MEAL INPUT ── */
+  .meal-num {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .meal-num button {
+    padding: 6px 16px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    color: var(--text2);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: 'DM Mono', monospace;
+  }
+  .meal-num button.active {
+    background: var(--green-dim);
+    border-color: #2a5a3a;
+    color: var(--green);
+  }
+  .meal-num-label {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 32px;
+    margin-right: 4px;
+  }
+
+  .input-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .input-wrap textarea {
+    flex: 1;
+    padding: 12px 14px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    resize: none;
+    height: 60px;
+    outline: none;
+    line-height: 1.5;
+    transition: border-color .15s;
+  }
+  .input-wrap textarea:focus { border-color: var(--text3); }
+  .input-wrap textarea::placeholder { color: var(--text3); }
+
+  /* ── STATUS ── */
+  .status-line {
+    font-size: 12px;
+    padding: 8px 0 0;
+    height: 28px;
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-line.ok { color: var(--green); }
+  .status-line.err { color: var(--red); }
+  .status-line.info { color: var(--amber); }
+
+  /* ── THINKING ── */
+  .thinking {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 0 0;
+  }
+  .thinking span { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; margin-left: 4px; }
+  .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--text3);
+    animation: dotpulse 1.2s ease-in-out infinite;
+  }
+  .dot:nth-child(2){animation-delay:.2s}
+  .dot:nth-child(3){animation-delay:.4s}
+  @keyframes dotpulse{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+  /* ── MEAL LIST ── */
+  .meals { padding: 0 20px; }
+  .meal-empty {
+    padding: 24px 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+  }
+  .meal-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    animation: fadeIn .2s ease;
+  }
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .meal-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .meal-left { display: flex; align-items: flex-start; gap: 8px; flex: 1; min-width: 0; }
+  .meal-num-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+    margin-top: 1px;
+  }
+  .meal-name {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--text);
+    flex: 1;
+  }
+  .meal-kcal {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--purple);
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+  }
+  .meal-macros {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 6px;
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    gap: 12px;
+  }
+  .meal-macros span { display: flex; align-items: center; gap: 3px; }
+  .macro-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+  /* ── SHEETS BAR ── */
+  .sheets-bar {
+    margin: 20px 20px 0;
+    padding: 12px 14px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .sheets-bar .sl {
+    font-size: 12px;
+    color: var(--text2);
+    font-family: 'DM Mono', monospace;
+  }
+  .sheets-bar a {
+    font-size: 12px;
+    color: var(--teal);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .sheets-bar a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Keto Agent</h1>
+      <div class="date" id="todayDate"></div>
+    </div>
+    <div class="sync-dot loading" id="syncDot" title="Status połączenia z Google Sheets"></div>
+  </div>
+
+  <!-- DAY NAV -->
+  <div class="day-nav">
+    <button onclick="changeDay(-1)">←</button>
+    <span class="day-label" id="dayLabel"></span>
+    <button onclick="changeDay(1)">→</button>
+  </div>
+
+  <!-- MACROS -->
+  <div class="macros">
+    <div class="macro-cell mc-kcal">
+      <div class="m-label">kcal</div>
+      <div class="m-val" id="v-kcal">0</div>
+      <div class="m-goal">/ 1950</div>
+      <div class="m-bar"><div class="m-fill" id="b-kcal" style="width:0%"></div></div>
+    </div>
+    <div class="macro-cell mc-prot">
+      <div class="m-label">białko</div>
+      <div class="m-val" id="v-prot">0</div>
+      <div class="m-unit">g</div>
+      <div class="m-goal">/ 122g</div>
+      <div class="m-bar"><div class="m-fill" id="b-prot" style="width:0%"></div></div>
+    </div>
+    <div class="macro-cell mc-fat">
+      <div class="m-label">tłuszcz</div>
+      <div class="m-val" id="v-fat">0</div>
+      <div class="m-unit">g</div>
+      <div class="m-goal">/ 152g</div>
+      <div class="m-bar"><div class="m-fill" id="b-fat" style="width:0%"></div></div>
+    </div>
+    <div class="macro-cell mc-carb">
+      <div class="m-label">węgle</div>
+      <div class="m-val" id="v-carb">0</div>
+      <div class="m-unit">g</div>
+      <div class="m-goal">max 24g</div>
+      <div class="m-bar"><div class="m-fill" id="b-carb" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- WEIGHT -->
+  <div class="section" style="margin-top:20px">
+    <div class="section-label">Waga poranna</div>
+    <div class="weight-row">
+      <input type="number" id="weightInput" placeholder="86.0" step="0.1" min="40" max="200">
+      <button class="btn cta" onclick="saveWeight()">Zapisz → Sheets</button>
+      <span id="wStatus" class="status-line" style="padding:0"></span>
+    </div>
+  </div>
+
+  <!-- ADD MEAL -->
+  <div class="section" style="margin-top:20px">
+    <div class="section-label">Dodaj posiłek</div>
+    <div class="meal-num">
+      <span class="meal-num-label">Posiłek</span>
+      <button id="p1" class="active" onclick="setMeal(1)">1</button>
+      <button id="p2" onclick="setMeal(2)">2</button>
+      <button id="p3" onclick="setMeal(3)">3</button>
+    </div>
+    <div class="input-wrap">
+      <textarea id="mealInput" placeholder="np. 3 jajka + awokado + 4 plastry boczku surowego wędzonego"></textarea>
+      <button class="btn cta" id="analyzeBtn" onclick="analyzeMeal()" style="height:60px">Oblicz AI</button>
+    </div>
+    <div class="thinking" id="thinking">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <span id="thinkingMsg">Analizuję posiłek...</span>
+    </div>
+    <div id="mealStatus" class="status-line"></div>
+  </div>
+
+  <!-- MEAL LIST -->
+  <div class="section" style="margin-top:20px">
+    <div class="section-label">Posiłki dnia</div>
+  </div>
+  <div class="meals" id="mealList">
+    <div class="meal-empty">ładowanie...</div>
+  </div>
+
+  <!-- SHEETS BAR -->
+  <div class="sheets-bar">
+    <span class="sl" id="sheetsStatus">Łączę z Google Sheets...</span>
+    <a href="https://docs.google.com/spreadsheets/d/1BdCh5GtPMnqa1IPdXoKMyZyY2ZUw9G2lDj5Xo3an8YM" target="_blank">Otwórz arkusz →</a>
+  </div>
+
+</div>
+
+<script>
+// ── CONFIG ──
+const API_URL = 'https://script.google.com/macros/s/AKfycbz2ZS7o5WDEKPGXrOlgACiVM_lz4VfJBsd8sJtWBeawGuvNGw74fmM1_v88-T49oECi/exec';
+const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
+const GOALS = { kcal: 1950, prot: 122, fat: 152, carb: 24 };
+const DAYS_PL = ['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
+const MONTHS_PL = ['sty','lut','mar','kwi','maj','cze','lip','sie','wrz','paź','lis','gru'];
+
+let currentMeal = 1;
+let currentDay = new Date(); currentDay.setHours(0,0,0,0);
+let localMeals = [];
+
+// ── UTILS ──
+function dayKey(d) {
+  return d.getFullYear() + '-'
+    + String(d.getMonth()+1).padStart(2,'0') + '-'
+    + String(d.getDate()).padStart(2,'0');
+}
+function formatDay(d) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = (d - today) / 86400000;
+  const base = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + d.getFullYear();
+  if (diff === 0) return 'dzisiaj · ' + base;
+  if (diff === -1) return 'wczoraj · ' + base;
+  if (diff === 1) return 'jutro · ' + base;
+  return DAYS_PL[d.getDay()].slice(0,3) + '. · ' + base;
+}
+
+// ── UI HELPERS ──
+function setSyncDot(state) {
+  const d = document.getElementById('syncDot');
+  d.className = 'sync-dot' + (state === 'ok' ? '' : state === 'off' ? ' off' : ' loading');
+}
+function setMeal(n) {
+  currentMeal = n;
+  [1,2,3].forEach(i => document.getElementById('p'+i).classList.toggle('active', i===n));
+}
+function setThinking(v, msg) {
+  document.getElementById('thinking').style.display = v ? 'flex' : 'none';
+  if (msg) document.getElementById('thinkingMsg').textContent = msg;
+  document.getElementById('analyzeBtn').disabled = v;
+}
+function showMealStatus(msg, type) {
+  const el = document.getElementById('mealStatus');
+  el.textContent = msg; el.className = 'status-line ' + (type||'');
+  if (type !== 'err') setTimeout(() => { el.textContent = ''; el.className = 'status-line'; }, 4000);
+}
+function showWStatus(msg, type) {
+  const el = document.getElementById('wStatus');
+  el.textContent = msg; el.className = 'status-line ' + (type||'');
+  setTimeout(() => { el.textContent = ''; el.className = 'status-line'; }, 3000);
+}
+
+// ── MACROS ──
+function updateMacros(meals) {
+  let kcal=0, prot=0, fat=0, carb=0;
+  meals.forEach(m => { kcal+=+m.kcal||0; prot+=+m.prot||0; fat+=+m.fat||0; carb+=+m.carb||0; });
+  document.getElementById('v-kcal').textContent = Math.round(kcal);
+  document.getElementById('v-prot').textContent = Math.round(prot);
+  document.getElementById('v-fat').textContent  = Math.round(fat);
+  document.getElementById('v-carb').textContent = Math.round(carb);
+  document.getElementById('b-kcal').style.width = Math.min(100, Math.round(kcal/GOALS.kcal*100)) + '%';
+  document.getElementById('b-prot').style.width = Math.min(100, Math.round(prot/GOALS.prot*100)) + '%';
+  document.getElementById('b-fat').style.width  = Math.min(100, Math.round(fat/GOALS.fat*100))  + '%';
+  const cp = Math.min(100, Math.round(carb/GOALS.carb*100));
+  const cb = document.getElementById('b-carb');
+  cb.style.width = cp + '%';
+  cb.className = 'm-fill' + (carb > GOALS.carb ? ' over' : '');
+}
+
+// ── RENDER MEALS ──
+function renderMeals(meals) {
+  const list = document.getElementById('mealList');
+  if (!meals || !meals.length) {
+    list.innerHTML = '<div class="meal-empty">brak posiłków · dodaj pierwszy</div>';
+    return;
+  }
+  list.innerHTML = meals.map(m => `
+    <div class="meal-card">
+      <div class="meal-top">
+        <div class="meal-left">
+          <span class="meal-num-badge">#${m.num}</span>
+          <span class="meal-name">${m.name}</span>
+        </div>
+        <span class="meal-kcal">${Math.round(m.kcal)}</span>
+      </div>
+      <div class="meal-macros">
+        <span><span class="macro-dot" style="background:#2dd4bf"></span>B ${Math.round(m.prot)}g</span>
+        <span><span class="macro-dot" style="background:#fbbf24"></span>T ${Math.round(m.fat)}g</span>
+        <span><span class="macro-dot" style="background:#4ade80"></span>W ${Math.round(m.carb)}g</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── SHEETS API ──
+async function callSheets(payload) {
+  const resp = await fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' }
+  });
+  return await resp.json();
+}
+
+async function loadDay() {
+  setSyncDot('loading');
+  document.getElementById('sheetsStatus').textContent = 'Ładowanie z arkusza...';
+  document.getElementById('mealList').innerHTML = '<div class="meal-empty">ładowanie...</div>';
+  try {
+    const res = await callSheets({ action: 'getDayData', date: dayKey(currentDay) });
+    if (res.success) {
+      localMeals = res.meals || [];
+      if (res.weight) document.getElementById('weightInput').value = res.weight;
+      else document.getElementById('weightInput').value = '';
+      updateMacros(localMeals);
+      renderMeals(localMeals);
+      setSyncDot('ok');
+      document.getElementById('sheetsStatus').textContent = 'Połączono · arkusz Dietka';
+    } else {
+      throw new Error(res.error || 'błąd');
+    }
+  } catch(e) {
+    setSyncDot('off');
+    document.getElementById('sheetsStatus').textContent = 'Brak połączenia · sprawdź Apps Script';
+    document.getElementById('mealList').innerHTML = '<div class="meal-empty">brak danych</div>';
+    updateMacros([]);
+  }
+}
+
+// ── SAVE WEIGHT ──
+async function saveWeight() {
+  const v = parseFloat(document.getElementById('weightInput').value);
+  if (isNaN(v) || v < 30 || v > 300) { showWStatus('podaj prawidłową wagę', 'err'); return; }
+  setSyncDot('loading');
+  try {
+    const res = await callSheets({ action: 'addWeight', date: dayKey(currentDay), weight: v });
+    if (res.success) { showWStatus('✓ ' + v + ' kg zapisano', 'ok'); setSyncDot('ok'); }
+    else throw new Error(res.error);
+  } catch(e) {
+    showWStatus('błąd zapisu', 'err'); setSyncDot('off');
+  }
+}
+
+// ── ANALYZE MEAL ──
+async function analyzeMeal() {
+  const text = document.getElementById('mealInput').value.trim();
+  if (!text) { showMealStatus('opisz posiłek przed obliczeniem', 'err'); return; }
+
+  setThinking(true, 'analizuję posiłek...');
+  showMealStatus('');
+
+  const prompt = `Jesteś ekspertem od wartości odżywczych. Podaj wartości odżywcze posiłku.
+
+Posiłek: "${text}"
+
+Odpowiedz TYLKO w formacie JSON (bez żadnego innego tekstu, bez markdown):
+{"name":"krótka nazwa po polsku max 50 znaków","kcal":liczba_całkowita,"prot":liczba_1_miejsce,"fat":liczba_1_miejsce,"carb":liczba_1_miejsce}
+
+Węglowodany = węgle NETTO (bez błonnika). Bądź precyzyjny.`;
+
+  try {
+    const resp = await fetch(ANTHROPIC_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await resp.json();
+    if (!data.content) throw new Error('Brak odpowiedzi AI');
+    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
+    const meal = JSON.parse(raw);
+    meal.num = currentMeal;
+
+    setThinking(true, 'zapisuję do Google Sheets...');
+    setSyncDot('loading');
+
+    const res = await callSheets({
+      action: 'addMeal',
+      date: dayKey(currentDay),
+      mealNum: currentMeal,
+      name: meal.name,
+      kcal: meal.kcal,
+      prot: meal.prot,
+      fat: meal.fat,
+      carb: meal.carb
+    });
+
+    localMeals.push(meal);
+    updateMacros(localMeals);
+    renderMeals(localMeals);
+    document.getElementById('mealInput').value = '';
+
+    if (res.success) {
+      setSyncDot('ok');
+      showMealStatus('✓ dodano · ' + meal.name + ' · ' + Math.round(meal.kcal) + ' kcal', 'ok');
+    } else {
+      setSyncDot('off');
+      showMealStatus('✓ AI ok · błąd Sheets: ' + (res.error || '?'), 'info');
+    }
+  } catch(e) {
+    showMealStatus('błąd: ' + e.message, 'err');
+    setSyncDot('off');
+  } finally {
+    setThinking(false);
+  }
+}
+
+// ── NAVIGATION ──
+function changeDay(n) {
+  currentDay = new Date(currentDay.getTime() + n * 86400000);
+  render();
+}
+
+// ── RENDER ──
+function render() {
+  document.getElementById('dayLabel').textContent = formatDay(currentDay);
+  localMeals = [];
+  loadDay();
+}
+
+// ── INIT ──
+const now = new Date();
+document.getElementById('todayDate').textContent =
+  DAYS_PL[now.getDay()] + ', ' + now.getDate() + ' ' + MONTHS_PL[now.getMonth()] + ' ' + now.getFullYear();
+
+render();
+</script>
+</body>
+</html>
