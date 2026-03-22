@@ -493,7 +493,7 @@
 
 <script>
 // ── CONFIG ──
-const API_URL = 'https://script.google.com/macros/s/AKfycbwOq3tvQasssn1txAHc67vHvJONa5ejhTsWhzfQsk4Uz90JFRN1BLelbl9q2zHStW-2/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbw3Dju3wdbkslTPQ1N3t69dB_52p0a9W1tRMBFGebIZI8sYLTMaoVa-57IxgZyMB_XT/exec';
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const GOALS = { kcal: 1950, prot: 122, fat: 152, carb: 24 };
 const DAYS_PL = ['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
@@ -588,12 +588,8 @@ function renderMeals(meals) {
 
 // ── SHEETS API ──
 async function callSheets(payload) {
-  const form = new FormData();
-  form.append('data', JSON.stringify(payload));
-  const resp = await fetch(API_URL, {
-    method: 'POST',
-    body: form
-  });
+  const url = API_URL + '?data=' + encodeURIComponent(JSON.stringify(payload)) + '&action=' + encodeURIComponent(payload.action);
+  const resp = await fetch(url);
   return await resp.json();
 }
 
@@ -643,35 +639,17 @@ async function analyzeMeal() {
 
   setThinking(true, 'analizuję posiłek...');
   showMealStatus('');
-
-  const prompt = `Jesteś ekspertem od wartości odżywczych. Podaj wartości odżywcze posiłku.
-
-Posiłek: "${text}"
-
-Odpowiedz TYLKO w formacie JSON (bez żadnego innego tekstu, bez markdown):
-{"name":"krótka nazwa po polsku max 50 znaków","kcal":liczba_całkowita,"prot":liczba_1_miejsce,"fat":liczba_1_miejsce,"carb":liczba_1_miejsce}
-
-Węglowodany = węgle NETTO (bez błonnika). Bądź precyzyjny.`;
+  setSyncDot('loading');
 
   try {
-    const resp = await fetch(ANTHROPIC_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await resp.json();
-    if (!data.content) throw new Error('Brak odpowiedzi AI');
-    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
-    const meal = JSON.parse(raw);
+    // Krok 1: analiza AI przez Apps Script (omija CORS)
+    const aiRes = await callSheets({ action: 'analyzeMeal', text });
+    if (!aiRes.success) throw new Error(aiRes.error || 'błąd AI');
+    const meal = aiRes.meal;
     meal.num = currentMeal;
 
+    // Krok 2: zapis do arkusza
     setThinking(true, 'zapisuję do Google Sheets...');
-    setSyncDot('loading');
-
     const res = await callSheets({
       action: 'addMeal',
       date: dayKey(currentDay),
@@ -693,7 +671,7 @@ Węglowodany = węgle NETTO (bez błonnika). Bądź precyzyjny.`;
       showMealStatus('✓ dodano · ' + meal.name + ' · ' + Math.round(meal.kcal) + ' kcal', 'ok');
     } else {
       setSyncDot('off');
-      showMealStatus('✓ AI ok · błąd Sheets: ' + (res.error || '?'), 'info');
+      showMealStatus('AI ok · błąd Sheets: ' + (res.error || '?'), 'info');
     }
   } catch(e) {
     showMealStatus('błąd: ' + e.message, 'err');
