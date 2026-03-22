@@ -588,10 +588,11 @@ function renderMeals(meals) {
 
 // ── SHEETS API ──
 async function callSheets(payload) {
+  const form = new FormData();
+  form.append('data', JSON.stringify(payload));
   const resp = await fetch(API_URL, {
     method: 'POST',
-    body: JSON.stringify(payload),
-    headers: { 'Content-Type': 'application/json' }
+    body: form
   });
   return await resp.json();
 }
